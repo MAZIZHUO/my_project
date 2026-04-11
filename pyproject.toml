@@ -8,6 +8,9 @@ dependencies = [
     "matplotlib>=3.10.8",
     "numpy>=2.4.4",
     "pandas>=3.0.2",
+    "polars>=1.39.3",
+    "pyarrow>=23.0.1",
+    "seaborn>=0.13.2",
 ]
 
 [[tool.uv.index]]
@@ -16,5 +19,6 @@ default = true   # 设为默认源
 
 [dependency-groups]
 dev = [
+    "black>=26.3.1",
     "jupyterlab>=4.5.6",
 ]
