@@ -19,7 +19,6 @@ default = true   # 设为默认源
 
 [dependency-groups]
 dev = [
-    "black>=26.3.1",
     "jupyterlab>=4.5.6",
     "ruff>=0.15.12",
 ]
