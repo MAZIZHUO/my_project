@@ -32,8 +32,8 @@ Write-Host "逻辑处理器：$($cpu.NumberOfLogicalProcessors)"
 # 内存信息
 Write-Host "`n[内存信息]" -ForegroundColor Yellow
 $totalRAM = [math]::Round($os.TotalVisibleMemorySize / 1MB, 2)
-$freeRAM  = [math]::Round($os.FreePhysicalMemory / 1MB, 2)
-$usedRAM  = [math]::Round($totalRAM - $freeRAM, 2)
+$freeRAM = [math]::Round($os.FreePhysicalMemory / 1MB, 2)
+$usedRAM = [math]::Round($totalRAM - $freeRAM, 2)
 Write-Host "总内存：$($totalRAM) GB"
 Write-Host "已使用：$($usedRAM) GB"
 Write-Host "剩余：$($freeRAM) GB"
@@ -43,8 +43,8 @@ Write-Host "`n[磁盘信息]" -ForegroundColor Yellow
 $disks = Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3"
 foreach ($disk in $disks) {
     $total = [math]::Round($disk.Size / 1GB, 2)
-    $free  = [math]::Round($disk.FreeSpace / 1GB, 2)
-    $used  = [math]::Round($total - $free, 2)
+    $free = [math]::Round($disk.FreeSpace / 1GB, 2)
+    $used = [math]::Round($total - $free, 2)
     Write-Host "磁盘 $($disk.DeviceID)  总共：$($total) GB  已用：$($used) GB  剩余：$($free) GB"
 }
 
@@ -62,7 +62,8 @@ try {
     Write-Host "Python 版本：$pythonVersion"
     $pipVersion = & pip --version 2>&1
     Write-Host "pip 版本：$pipVersion"
-} catch {
+}
+catch {
     Write-Host "未检测到 Python" -ForegroundColor Red
 }
 
