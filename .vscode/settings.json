@@ -4,5 +4,6 @@
         "06_sixth_course"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "livePreview.defaultPreviewPath": "/08_data_science/dice.html"
 }
