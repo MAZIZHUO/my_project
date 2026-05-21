@@ -975,6 +975,7 @@ dependencies = [
     { name = "pyarrow" },
     { name = "pygame-ce" },
     { name = "pyinstaller" },
+    { name = "requests" },
     { name = "seaborn" },
 ]
 
@@ -997,6 +998,7 @@ requires-dist = [
     { name = "pyarrow", specifier = ">=23.0.1" },
     { name = "pygame-ce", specifier = ">=2.5.7" },
     { name = "pyinstaller", specifier = ">=6.20.0" },
+    { name = "requests", specifier = ">=2.33.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
 ]
 
