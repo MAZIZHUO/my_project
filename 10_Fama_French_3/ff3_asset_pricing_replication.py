@@ -245,3 +245,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# 直接运行（python xxx.py）时，__name__ 的值是 "__main__"
+# 被当作模块导入（import xxx）时，__name__ 是模块名（如 "ff3_asset_pricing_replication"）

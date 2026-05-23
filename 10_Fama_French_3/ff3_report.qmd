@@ -1,0 +1,586 @@
+---
+title: "Fama-French Three-Factor Model Replication"
+subtitle: "Size and Book-to-Market Portfolio Analysis"
+author: "Asset Pricing Research"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    number-sections: true
+    theme: cosmo
+    code-fold: true
+    code-tools: true
+    self-contained: true
+    df-print: kable
+    highlight-style: github
+    fig-responsive: true
+    fig-width: 7
+    fig-height: 4.5
+  pdf:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    colorlinks: true
+    fig-width: 6
+    fig-height: 3.8
+    fig-pos: "H"
+    geometry:
+      - top=25mm
+      - left=25mm
+      - right=25mm
+      - bottom=25mm
+    include-in-header:
+      text: |
+        \usepackage{booktabs}
+        \usepackage{longtable}
+        \usepackage{float}
+        \usepackage{caption}
+        \floatplacement{figure}{H}
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: false
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+from pathlib import Path
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import statsmodels.api as sm
+from IPython.display import display
+import warnings
+warnings.filterwarnings("ignore")
+
+# ── paths ──────────────────────────────────────────────────────────────────
+BASE        = Path(".")
+DATA_DIR    = BASE / "data"
+OUTPUT_DIR  = BASE / "output"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+FACTOR_FILE    = DATA_DIR / "F-F_Research_Data_Factors_daily.csv"
+PORTFOLIO_FILE = DATA_DIR / "6_Portfolios_2x3_Daily.csv"
+
+PORTFOLIO_COLS = ["SMALL LoBM","ME1 BM2","SMALL HiBM",
+                  "BIG LoBM",  "ME2 BM2", "BIG HiBM"]
+FACTOR_COLS    = ["MKT","SMB","HML"]
+PALETTE        = ["#2f6f73","#8a5a44","#6f5aa8","#b5722d","#4a7c4e","#a84c4c"]
+
+sns.set_theme(style="whitegrid", font="DejaVu Sans")
+
+# ── matplotlib: let Quarto control figure size via fig-width/fig-height ────
+# We pass figsize=(W, H) matching the Quarto defaults so savefig is consistent
+PDF_W, PDF_H   = 6, 3.8
+HTML_W, HTML_H = 7, 4.5
+
+# ── data loading ───────────────────────────────────────────────────────────
+def read_first_panel(path):
+    df = pd.read_csv(path)
+    first_blank = df["TIME"].isna().idxmax() if df["TIME"].isna().any() else len(df)
+    return df.iloc[:first_blank].copy()
+
+def load_factors():
+    ff = read_first_panel(FACTOR_FILE)
+    ff = ff.rename(columns={"TIME":"Date","Mkt-RF":"MKT","SMB":"SMB",
+                             "HML":"HML","RF":"RF"})
+    ff[FACTOR_COLS+["RF"]] = ff[FACTOR_COLS+["RF"]].apply(pd.to_numeric, errors="coerce")
+    ff = ff.dropna(subset=["Date"]+FACTOR_COLS+["RF"])
+    ff["Date"] = pd.to_datetime(ff["Date"], format="%Y%m%d")
+    return ff.set_index("Date")
+
+def load_portfolios():
+    port = read_first_panel(PORTFOLIO_FILE)
+    port = port.rename(columns={"TIME":"Date"})
+    port[PORTFOLIO_COLS] = port[PORTFOLIO_COLS].apply(pd.to_numeric, errors="coerce")
+    port = port.dropna(subset=["Date"]+PORTFOLIO_COLS)
+    port["Date"] = pd.to_datetime(port["Date"], format="%Y%m%d")
+    return port.set_index("Date")
+
+def prepare_data():
+    ff   = load_factors()
+    port = load_portfolios()
+    data = port.merge(ff, left_index=True, right_index=True, how="inner")
+    for col in PORTFOLIO_COLS:
+        data[f"{col}_excess"] = data[col] - data["RF"]
+    return data
+
+def run_ff3(data):
+    X = sm.add_constant(data[FACTOR_COLS])
+    rows, models = [], {}
+    for col in PORTFOLIO_COLS:
+        m = sm.OLS(data[f"{col}_excess"], X).fit(cov_type="HAC",
+                                                  cov_kwds={"maxlags":5})
+        models[col] = m
+        rows.append({
+            "Portfolio" : col,
+            "Alpha"     : m.params["const"],
+            "t(Alpha)"  : m.tvalues["const"],
+            "β(MKT)"    : m.params["MKT"],
+            "t(MKT)"    : m.tvalues["MKT"],
+            "β(SMB)"    : m.params["SMB"],
+            "t(SMB)"    : m.tvalues["SMB"],
+            "β(HML)"    : m.params["HML"],
+            "t(HML)"    : m.tvalues["HML"],
+            "R²"        : m.rsquared,
+            "Adj. R²"   : m.rsquared_adj,
+            "N"         : int(m.nobs),
+        })
+    return pd.DataFrame(rows).set_index("Portfolio"), models
+
+data           = prepare_data()
+reg_table, _   = run_ff3(data)
+excess_cols    = [f"{col}_excess" for col in PORTFOLIO_COLS]
+START          = data.index.min().strftime("%B %d, %Y")
+END            = data.index.max().strftime("%B %d, %Y")
+N_OBS          = len(data)
+```
+
+# Introduction
+
+This report replicates the **Fama-French three-factor (FF3) model** using
+daily data from Kenneth French's data library. The six test portfolios are
+formed on the two-way sort of **size** (market equity, ME) and
+**book-to-market ratio** (BM), yielding 2 × 3 = 6 portfolios.
+
+| Symbol | Description |
+|--------|-------------|
+| MKT    | Excess market return ($R_m - R_f$) |
+| SMB    | Small-Minus-Big (size factor) |
+| HML    | High-Minus-Low (value factor) |
+
+The regression specification for portfolio $i$ is:
+
+$$
+R_{i,t} - R_{f,t} = \alpha_i
+  + \beta_i^{\text{MKT}}\,\text{MKT}_t
+  + \beta_i^{\text{SMB}}\,\text{SMB}_t
+  + \beta_i^{\text{HML}}\,\text{HML}_t + \varepsilon_{i,t}
+$$
+
+Standard errors are **Newey-West** adjusted (5 lags).
+
+## Sample Information
+
+```{python}
+#| label: sample-info
+summary = pd.DataFrame({
+    "Item"  : ["Start date","End date","Daily observations","Data source"],
+    "Value" : [START, END, f"{N_OBS:,}",
+               "Kenneth R. French Data Library (daily)"]
+}).set_index("Item")
+display(summary)
+```
+
+---
+
+# Factor Summary Statistics
+
+```{python}
+#| label: tbl-factor-stats
+#| tbl-cap: "Descriptive statistics for Fama-French daily factors (% per day)."
+
+fstats = data[FACTOR_COLS].agg(["mean","std","min","max"])
+fstats.loc["Skewness"] = data[FACTOR_COLS].skew()
+fstats.loc["Kurtosis"] = data[FACTOR_COLS].kurt()
+fstats.loc["t-stat"]   = (fstats.loc["mean"] / fstats.loc["std"] * np.sqrt(N_OBS))
+fstats.index = ["Mean","Std Dev","Min","Max","Skewness","Kurtosis","t-stat"]
+display(fstats.round(4))
+```
+
+```{python}
+#| label: fig-factor-ts
+#| fig-cap: "Daily time series of the three Fama-French factors."
+#| fig-width: 7
+#| fig-height: 5.5
+
+fig, axes = plt.subplots(3, 1, figsize=(7, 5.5), sharex=True)
+colors = ["#2f6f73","#8a5a44","#6f5aa8"]
+labels = ["MKT — Market excess return",
+          "SMB — Small Minus Big",
+          "HML — High Minus Low"]
+
+for ax, factor, color, lbl in zip(axes, FACTOR_COLS, colors, labels):
+    ax.plot(data.index, data[factor], color=color, linewidth=0.5, alpha=0.85)
+    ax.axhline(0, color="black", linewidth=0.6, linestyle="--")
+    ax.set_ylabel(f"{factor} (%)", fontsize=9)
+    ax.set_title(lbl, fontsize=9, pad=2)
+
+axes[-1].set_xlabel("Date", fontsize=9)
+fig.suptitle("Daily Fama-French Three Factors", fontsize=11, fontweight="bold")
+plt.tight_layout()
+plt.savefig(OUTPUT_DIR/"figure_factor_timeseries.png", dpi=150, bbox_inches="tight")
+plt.show()
+```
+
+---
+
+# Portfolio Excess Return Statistics
+
+```{python}
+#| label: tbl-port-stats
+#| tbl-cap: "Descriptive statistics for 6 portfolio daily excess returns (% per day)."
+
+pstats = data[excess_cols].agg(["mean","std","min","max"]).T
+pstats.index = PORTFOLIO_COLS
+pstats.columns = ["Mean","Std Dev","Min","Max"]
+pstats["Sharpe (ann.)"] = (pstats["Mean"] / pstats["Std Dev"]) * np.sqrt(252)
+pstats["t-stat"]        = pstats["Mean"] / pstats["Std Dev"] * np.sqrt(N_OBS)
+display(pstats.round(4))
+```
+
+```{python}
+#| label: fig-cumret
+#| fig-cap: "Cumulative excess returns of the six size-BM portfolios (log scale)."
+#| fig-width: 7
+#| fig-height: 4.5
+
+cumulative = (1 + data[excess_cols] / 100).cumprod()
+cumulative.columns = PORTFOLIO_COLS
+
+fig, ax = plt.subplots(figsize=(7, 4.5))
+for col, color in zip(PORTFOLIO_COLS, PALETTE):
+    ax.plot(cumulative.index, cumulative[col],
+            linewidth=1.1, label=col, color=color)
+
+ax.set_title("Cumulative Excess Returns — 6 Size × BM Portfolios",
+             fontsize=11, fontweight="bold")
+ax.set_xlabel("Date", fontsize=9)
+ax.set_yscale("log")
+ax.set_ylabel("Cumulative return (log scale)", fontsize=9)
+ax.legend(ncol=3, fontsize=8, framealpha=0.6)
+plt.tight_layout()
+plt.savefig(OUTPUT_DIR/"figure_cumulative_excess_returns.png", dpi=150, bbox_inches="tight")
+plt.show()
+```
+
+---
+
+# Correlation Matrix
+
+```{python}
+#| label: tbl-corr-build
+#| include: false
+
+all_cols = FACTOR_COLS + excess_cols
+corr = data[all_cols].corr()
+corr = corr.rename(
+    index   = {f"{c}_excess": c for c in PORTFOLIO_COLS},
+    columns = {f"{c}_excess": c for c in PORTFOLIO_COLS},
+)
+```
+
+::: {.content-visible when-format="html"}
+```{python}
+#| label: tbl-corr-html
+#| tbl-cap: "Pearson correlation matrix of factors and portfolio excess returns."
+display(corr.round(3))
+```
+:::
+
+::: {.content-visible when-format="pdf"}
+```{python}
+#| label: tbl-corr-pdf
+#| output: asis
+
+latex_body = corr.round(3).to_latex(
+    float_format="%.3f",
+    column_format="l" + "r" * len(corr.columns),
+)
+print(r"""
+\begin{table}[H]
+\caption{Pearson correlation matrix of factors and portfolio excess returns.}
+\resizebox{\textwidth}{!}{%
+""" + latex_body + r"""
+}
+\end{table}
+""")
+```
+:::
+
+```{python}
+#| label: fig-heatmap
+#| fig-cap: "Heatmap of the correlation matrix."
+#| fig-width: 6
+#| fig-height: 5
+
+fig, ax = plt.subplots(figsize=(6, 5))
+sns.heatmap(
+    corr, ax=ax,
+    cmap="vlag", center=0,
+    annot=True, fmt=".2f", annot_kws={"size": 7},
+    square=True, linewidths=0.4,
+    cbar_kws={"shrink": 0.75},
+)
+ax.set_title("Correlation Matrix", fontsize=11, fontweight="bold", pad=8)
+plt.tight_layout()
+plt.savefig(OUTPUT_DIR/"figure_correlation_heatmap.png", dpi=150, bbox_inches="tight")
+plt.show()
+```
+
+---
+
+# Fama-French Three-Factor Regressions
+
+## Regression Coefficients
+
+```{python}
+#| label: tbl-reg-build
+#| include: false
+
+def sig_star(t):
+    a = abs(t)
+    if a > 2.576: return "***"
+    if a > 1.960: return "**"
+    if a > 1.645: return "*"
+    return ""
+
+display_rows = []
+for port in PORTFOLIO_COLS:
+    r = reg_table.loc[port]
+    display_rows.append({
+        "Portfolio" : port,
+        "α"         : f"{r['Alpha']:.4f}{sig_star(r['t(Alpha)'])}",
+        "(t-α)"     : f"({r['t(Alpha)']:.2f})",
+        "β MKT"     : f"{r['β(MKT)']:.4f}{sig_star(r['t(MKT)'])}",
+        "(t-MKT)"   : f"({r['t(MKT)']:.2f})",
+        "β SMB"     : f"{r['β(SMB)']:.4f}{sig_star(r['t(SMB)'])}",
+        "(t-SMB)"   : f"({r['t(SMB)']:.2f})",
+        "β HML"     : f"{r['β(HML)']:.4f}{sig_star(r['t(HML)'])}",
+        "(t-HML)"   : f"({r['t(HML)']:.2f})",
+        "R²"        : f"{r['R²']:.4f}",
+        "N"         : f"{int(r['N']):,}",
+    })
+
+tbl = pd.DataFrame(display_rows).set_index("Portfolio")
+```
+
+::: {.content-visible when-format="html"}
+```{python}
+#| label: tbl-reg-html
+#| tbl-cap: "FF3 regression results. t-statistics in parentheses (Newey-West, 5 lags). *** p<0.01, ** p<0.05, * p<0.10."
+display(tbl)
+```
+:::
+
+::: {.content-visible when-format="pdf"}
+```{python}
+#| label: tbl-reg-pdf
+#| output: asis
+
+col_fmt = "l" + "r" * len(tbl.columns)
+latex_body = tbl.to_latex(column_format=col_fmt, escape=False)
+print(r"""\begin{table}[H]
+\caption{FF3 regression results. t-statistics in parentheses (Newey-West, 5 lags). *** $p<0.01$, ** $p<0.05$, * $p<0.10$.}
+\resizebox{\textwidth}{!}{%
+""" + latex_body + r"""
+}
+\end{table}
+""")
+```
+:::
+
+## Alpha Estimates
+
+```{python}
+#| label: fig-alpha
+#| fig-cap: "FF3 daily alpha estimates with ±2 SE error bars."
+#| fig-width: 6
+#| fig-height: 3.8
+
+alphas  = reg_table["Alpha"]
+t_stats = reg_table["t(Alpha)"]
+se      = alphas / t_stats
+
+fig, ax = plt.subplots(figsize=(6, 3.8))
+colors  = ["#2f6f73" if a >= 0 else "#a84c4c" for a in alphas]
+ax.bar(alphas.index, alphas.values, color=colors, width=0.55, alpha=0.85)
+ax.errorbar(alphas.index, alphas.values,
+            yerr=2 * se.values,
+            fmt="none", color="black", capsize=4, linewidth=1.1)
+ax.axhline(0, color="black", linewidth=0.9, linestyle="--")
+ax.set_title("FF3 Alpha Estimates (± 2 SE)", fontsize=11, fontweight="bold")
+ax.set_xlabel("Portfolio", fontsize=9)
+ax.set_ylabel("Daily alpha (%)", fontsize=9)
+ax.tick_params(axis="x", rotation=20)
+plt.tight_layout()
+plt.savefig(OUTPUT_DIR/"figure_alpha_bar.png", dpi=150, bbox_inches="tight")
+plt.show()
+```
+
+## Factor Loadings Comparison
+
+```{python}
+#| label: fig-loadings
+#| fig-cap: "Factor loadings (β) for MKT, SMB, and HML across the six portfolios."
+#| fig-width: 7
+#| fig-height: 4
+
+betas = reg_table[["β(MKT)","β(SMB)","β(HML)"]].copy()
+betas.columns = ["MKT","SMB","HML"]
+
+x = np.arange(len(PORTFOLIO_COLS))
+w = 0.25
+fig, ax = plt.subplots(figsize=(7, 4))
+
+for i, (factor, color) in enumerate(zip(["MKT","SMB","HML"],
+                                         ["#2f6f73","#8a5a44","#6f5aa8"])):
+    ax.bar(x + i*w, betas[factor], width=w, label=factor,
+           color=color, alpha=0.85)
+
+ax.set_xticks(x + w)
+ax.set_xticklabels(PORTFOLIO_COLS, rotation=20, ha="right", fontsize=8)
+ax.axhline(0, color="black", linewidth=0.7)
+ax.set_title("Factor Loadings by Portfolio", fontsize=11, fontweight="bold")
+ax.set_ylabel("Factor loading (β)", fontsize=9)
+ax.legend(fontsize=9)
+plt.tight_layout()
+plt.savefig(OUTPUT_DIR/"figure_factor_loadings.png", dpi=150, bbox_inches="tight")
+plt.show()
+```
+
+---
+
+# Model Fit — R²
+
+```{python}
+#| label: tbl-r2
+#| tbl-cap: "Goodness-of-fit summary for each portfolio regression."
+
+r2_tbl = reg_table[["R²","Adj. R²","N"]].copy()
+r2_tbl["N"] = r2_tbl["N"].apply(lambda x: f"{int(x):,}")
+display(r2_tbl.round(4))
+```
+
+```{python}
+#| label: fig-r2
+#| fig-cap: "R² by portfolio. Dashed line shows the cross-portfolio mean."
+#| fig-width: 6
+#| fig-height: 3.5
+
+fig, ax = plt.subplots(figsize=(6, 3.5))
+ax.barh(reg_table.index, reg_table["R²"], color=PALETTE, alpha=0.85, height=0.5)
+ax.set_xlim(0, 1)
+ax.axvline(reg_table["R²"].mean(), color="black", linestyle="--",
+           linewidth=1, label=f"Mean = {reg_table['R²'].mean():.4f}")
+ax.set_xlabel("R²", fontsize=9)
+ax.set_title("Model Fit (R²) by Portfolio", fontsize=11, fontweight="bold")
+ax.legend(fontsize=8)
+plt.tight_layout()
+plt.savefig(OUTPUT_DIR/"figure_r2.png", dpi=150, bbox_inches="tight")
+plt.show()
+```
+
+---
+
+# Interpretation
+
+```{python}
+#| label: tbl-interpretation
+
+best_alpha = reg_table["Alpha"].abs().idxmax()
+best_r2    = reg_table["R²"].idxmax()
+mean_r2    = reg_table["R²"].mean()
+
+findings = pd.DataFrame({
+    "Finding"  : [
+        "Average R²",
+        "Highest |alpha|",
+        "Best-fit portfolio",
+        "SMB: Small vs Big LoBM",
+        "HML: Small HiBM vs Big LoBM",
+    ],
+    "Value"    : [
+        f"{mean_r2:.4f}",
+        f"{best_alpha}  ({reg_table.loc[best_alpha,'Alpha']:.4f}% / day)",
+        f"{best_r2}  (R² = {reg_table.loc[best_r2,'R²']:.4f})",
+        f"{reg_table.loc['SMALL LoBM','β(SMB)']:.3f}  vs  "
+        f"{reg_table.loc['BIG LoBM','β(SMB)']:.3f}",
+        f"{reg_table.loc['SMALL HiBM','β(HML)']:.3f}  vs  "
+        f"{reg_table.loc['BIG LoBM','β(HML)']:.3f}",
+    ]
+}).set_index("Finding")
+display(findings)
+```
+
+**Market factor (MKT):** All portfolios load positively and significantly
+near 1.0, consistent with well-diversified equity exposure.
+
+**Size factor (SMB):** Small-cap portfolios carry large positive SMB loadings;
+big-cap portfolios have near-zero or negative loadings — confirming size separation.
+
+**Value factor (HML):** High-BM portfolios carry large positive HML loadings;
+low-BM portfolios carry negative loadings — the classic value vs growth split.
+
+**Alpha:** Most alphas are economically small and often statistically
+indistinguishable from zero, confirming the FF3 model captures the bulk of
+cross-sectional variation in these portfolios.
+
+---
+
+# Saved Output Files
+
+```{python}
+#| label: save-tables
+#| include: false
+
+data[FACTOR_COLS].agg(["mean","std","min","max"]).round(6).to_csv(
+    OUTPUT_DIR/"table_factor_statistics.csv")
+pstats.round(6).to_csv(
+    OUTPUT_DIR/"table_portfolio_excess_return_statistics.csv")
+corr.round(6).to_csv(
+    OUTPUT_DIR/"table_correlation_matrix.csv")
+reg_table.round(6).to_csv(
+    OUTPUT_DIR/"table_ff3_regression_results.csv")
+```
+
+::: {.content-visible when-format="html"}
+| File | Description |
+|------|-------------|
+| `table_factor_statistics.csv` | Factor descriptive stats |
+| `table_portfolio_excess_return_statistics.csv` | Portfolio excess-return stats |
+| `table_correlation_matrix.csv` | Full correlation matrix |
+| `table_ff3_regression_results.csv` | Regression coefficients |
+| `figure_factor_timeseries.png` | Factor time-series chart |
+| `figure_cumulative_excess_returns.png` | Cumulative-return chart |
+| `figure_alpha_bar.png` | Alpha bar chart with error bars |
+| `figure_factor_loadings.png` | Factor loadings bar chart |
+| `figure_correlation_heatmap.png` | Correlation heatmap |
+| `figure_r2.png` | R-squared bar chart |
+:::
+
+::: {.content-visible when-format="pdf"}
+\begin{table}[H]
+\caption{Output files saved to the \texttt{output/} directory.}
+\begin{tabular}{p{7cm}p{7cm}}
+\toprule
+\textbf{File} & \textbf{Description} \\
+\midrule
+\texttt{table\_factor\_statistics.csv} & Factor descriptive stats \\
+\texttt{table\_portfolio\_excess\_return\_statistics.csv} & Portfolio excess-return stats \\
+\texttt{table\_correlation\_matrix.csv} & Full correlation matrix \\
+\texttt{table\_ff3\_regression\_results.csv} & Regression coefficients \\
+\texttt{figure\_factor\_timeseries.png} & Factor time-series chart \\
+\texttt{figure\_cumulative\_excess\_returns.png} & Cumulative-return chart \\
+\texttt{figure\_alpha\_bar.png} & Alpha bar chart with error bars \\
+\texttt{figure\_factor\_loadings.png} & Factor loadings bar chart \\
+\texttt{figure\_correlation\_heatmap.png} & Correlation heatmap \\
+\texttt{figure\_r2.png} & R-squared bar chart \\
+\bottomrule
+\end{tabular}
+\end{table}
+:::
+
+---
+
+# References
+
+- Fama, E. F., & French, K. R. (1993). Common risk factors in the returns on stocks and bonds. *Journal of Financial Economics*, 33(1), 3–56.
+- French, K. R. Data Library. <https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html>
+- Newey, W. K., & West, K. D. (1987). A simple, positive semi-definite, heteroskedasticity and autocorrelation consistent covariance matrix. *Econometrica*, 55(3), 703–708.
