@@ -1,15 +1,107 @@
-# Python-generated files
+# Python bytecode and caches
 __pycache__/
-*.py[oc]
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyre/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments and local package builds
+.venv/
+venv/
+env/
+ENV/
+.env/
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
 
-# Virtual environments
-.venv
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
 
-.claude
+# IDE, OS, and local tool state
+.vscode/
+.idea/
+.claude/
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+desktop.ini
 
-# Data files
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+~$*
+
+# Raw data and large tabular/binary data files
 *.csv
+*.tsv
+*.txt.gz
+*.csv.gz
+*.tsv.gz
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.parquet
+*.feather
+*.arrow
+*.h5
+*.hdf5
+*.db
+*.sqlite
+*.sqlite3
+*.duckdb
+*.dta
+*.sav
+*.sas7bdat
+
+# Keep small data dictionaries and documentation trackable
+!**/*[DES]*.txt
+!**/README*.md
+
+# Generated analysis outputs
+**/output*/
+!**/output*/.gitkeep
+
+# Large model/checkpoint/artifact files
+*.pkl
+*.pickle
+*.joblib
+*.npy
+*.npz
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.model
+
+# Frontend/node artifacts, useful if notebooks or apps add them later
+node_modules/
+.next/
+.nuxt/
+coverage/
+
+# uv local caches
+.uv-cache/
