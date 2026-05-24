@@ -1,2 +1,0 @@
-start_date,end_date,n_stock_days,n_stocks,lookback_days,tail_quantile,holding_days
-2020-02-21,2024-12-31,5579327,5536,50,0.1,20
