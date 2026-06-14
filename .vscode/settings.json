@@ -5,5 +5,7 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
-    "livePreview.defaultPreviewPath": "/08_data_science/dice.html"
+    "livePreview.defaultPreviewPath": "/08_data_science/dice.html",
+    "trae.tab.enableRename": false,
+    "trae.tab.enableAutoImport": false
 }
