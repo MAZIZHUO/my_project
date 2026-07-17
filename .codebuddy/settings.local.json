@@ -1,0 +1,7 @@
+{
+  "enabledPlugins": {
+    "finance-data@cb_teams_marketplace": true,
+    "ai-hedge-fund@cb_teams_marketplace": true,
+    "a-share-analysis@cb_teams_marketplace": true
+  }
+}
