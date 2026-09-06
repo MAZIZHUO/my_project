@@ -1,0 +1,158 @@
+{
+  "asset": "yuntuan-samoyed",
+  "target_dimensions": [
+    1536,
+    2288
+  ],
+  "grid": {
+    "cols": 8,
+    "rows": 11,
+    "cell_w": 192,
+    "cell_h": 208
+  },
+  "frames_required_per_row": {
+    "IDLE": 6,
+    "RUNNING RIGHT": 8,
+    "RUNNING LEFT": 8,
+    "WAVING": 4,
+    "JUMPING": 5,
+    "FAILED": 8,
+    "WAITING": 6,
+    "RUNNING / WORKING": 6,
+    "REVIEW": 6,
+    "LOOK DIRECTIONS FIRST HALF": 8,
+    "LOOK DIRECTIONS SECOND HALF": 8
+  },
+  "frames_present": 73,
+  "frames_missing": [],
+  "summary_pass": true,
+  "checks": [
+    {
+      "name": "dimensions 1536 x 2288",
+      "pass": true,
+      "actual": [
+        1536,
+        2288
+      ]
+    },
+    {
+      "name": "PNG mode RGBA",
+      "pass": true,
+      "actual": "RGBA"
+    },
+    {
+      "name": "WebP dimensions 1536 x 2288",
+      "pass": true,
+      "actual": [
+        1536,
+        2288
+      ]
+    },
+    {
+      "name": "WebP has alpha",
+      "pass": true,
+      "actual": "RGBA"
+    },
+    {
+      "name": "grid 8 x 11",
+      "pass": true
+    },
+    {
+      "name": "cell 192 x 208",
+      "pass": true,
+      "actual": [
+        192,
+        208
+      ]
+    },
+    {
+      "name": "transparent pixels are RGB(0,0,0)",
+      "pass": true,
+      "max_r": 0
+    },
+    {
+      "name": "WebP RGB exact everywhere",
+      "pass": true,
+      "max_rgb_diff": 0
+    },
+    {
+      "name": "WebP alpha exact everywhere",
+      "pass": true,
+      "max_alpha_diff": 0
+    },
+    {
+      "name": "all unused cells fully transparent",
+      "pass": true
+    },
+    {
+      "name": "all 73 required frames present",
+      "pass": true,
+      "present": 73,
+      "required": 73,
+      "missing": []
+    },
+    {
+      "name": "every used cell contains exactly one isolated sprite",
+      "pass": true,
+      "violations": []
+    },
+    {
+      "name": "no checkerboard remnant (largest neutral-grey blob < 100 px)",
+      "pass": true,
+      "violations": []
+    },
+    {
+      "name": "no text-like remnant",
+      "pass": true,
+      "violations": []
+    },
+    {
+      "name": "no opaque white or black background (canvas is fully transparent)",
+      "pass": true
+    },
+    {
+      "name": "no frames clipped at cell edges (2 px rim transparent)",
+      "pass": true
+    },
+    {
+      "name": "no pixels connect to neighbouring cells",
+      "pass": true
+    },
+    {
+      "name": "no saturated colour in transparent areas",
+      "pass": true,
+      "saturated_transparent_pixels": 0
+    },
+    {
+      "name": "character colour consistent across frames",
+      "pass": true,
+      "mean_rgb": [
+        210.3,
+        201.8,
+        198.9
+      ],
+      "std_across_frames_rgb": [
+        0.7,
+        0.7,
+        0.8
+      ],
+      "frames_measured": 73
+    },
+    {
+      "name": "no large character-height jumps",
+      "pass": true,
+      "height_min": 149,
+      "height_max": 181
+    },
+    {
+      "name": "running-right vs running-left correct",
+      "pass": true,
+      "note": "row 1 all face right, row 2 all face left - visually verified"
+    },
+    {
+      "name": "look directions 000 / 090 / 180 / 270 clear",
+      "pass": true,
+      "note": "r9c0 up, r9c4 right, r10c0 down, r10c4 left - visually verified"
+    }
+  ]
+}
